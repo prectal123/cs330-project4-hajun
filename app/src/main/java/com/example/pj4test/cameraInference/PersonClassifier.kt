@@ -27,16 +27,17 @@ import org.tensorflow.lite.support.image.ops.Rot90Op
 import org.tensorflow.lite.task.core.BaseOptions
 import org.tensorflow.lite.task.vision.detector.Detection
 import org.tensorflow.lite.task.vision.detector.ObjectDetector
+import com.example.pj4test.controller.ModelController
 
 class PersonClassifier {
     // Libraries for object detection
     lateinit var objectDetector: ObjectDetector
-
     // Listener that will be handle the result of this classifier
     private var objectDetectorListener: DetectorListener? = null
-
+    lateinit var controller : ModelController
     fun initialize(context: Context) {
         setupObjectDetector(context)
+        controller = ModelController()
     }
 
     // Initialize the object detector using current settings on the
@@ -82,6 +83,7 @@ class PersonClassifier {
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
 
         val results = objectDetector.detect(tensorImage)
+        controller.setResult(results.toString())
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
         objectDetectorListener?.onObjectDetectionResults(
             results,
