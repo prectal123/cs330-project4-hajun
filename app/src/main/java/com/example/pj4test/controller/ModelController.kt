@@ -3,7 +3,7 @@ package com.example.pj4test.controller
 import android.util.Log
 import android.os.SystemClock
 
-class ModelController {
+class ModelController private constructor() {
     private var result = ""
     private var reloadInterval = 0L
     private var allowTime = 0L
@@ -31,5 +31,16 @@ class ModelController {
     fun setReloadTime(time: Long){
         reloadInterval = time
     }
+    companion object {
+        // Singleton instance
+        @Volatile
+        private var instance: ModelController? = null
 
+        // Get the instance of the ModelManager class
+        fun getInstance(): ModelController {
+            return instance ?: synchronized(this) {
+                instance ?: ModelController().also { instance = it }
+            }
+        }
+    }
 }

@@ -37,7 +37,8 @@ class PersonClassifier {
     lateinit var controller : ModelController
     fun initialize(context: Context) {
         setupObjectDetector(context)
-        controller = ModelController()
+        controller = ModelController.getInstance()
+        controller.setReloadTime(0L)
     }
 
     // Initialize the object detector using current settings on the
@@ -69,6 +70,9 @@ class PersonClassifier {
     fun detect(image: Bitmap, imageRotation: Int) {
         // Inference time is the difference between the system time at the start and finish of the
         // process
+        if(!controller.allowRun()){
+            return
+        }
         var inferenceTime = SystemClock.uptimeMillis()
 
         // Create preprocessor for the image.

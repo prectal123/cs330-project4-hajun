@@ -9,14 +9,14 @@ import org.tensorflow.lite.support.audio.TensorAudio
 import org.tensorflow.lite.task.audio.classifier.AudioClassifier
 import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
-
+import com.example.pj4test.controller.ModelController
 
 class SnapClassifier {
     // Libraries for audio classification
     lateinit var classifier: AudioClassifier
     lateinit var recorder: AudioRecord
     lateinit var tensor: TensorAudio
-
+    lateinit var controller: ModelController
     // Listener that will be handle the result of this classifier
     private var detectorListener: DetectorListener? = null
 
@@ -33,7 +33,8 @@ class SnapClassifier {
      * @param   context Context of the application
      */
     fun initialize(context: Context) {
-        classifier = AudioClassifier.createFromFile(context, YAMNET_MODEL)
+        classifier = AudioClassifier.createFromFile(context, TEACHED_MODEL)
+        controller = ModelController.getInstance()
         Log.d(TAG, "Model loaded from: $YAMNET_MODEL")
         audioInitialize()
         startRecording()
@@ -98,15 +99,17 @@ class SnapClassifier {
         Log.d(TAG, tensor.tensorBuffer.shape.joinToString(","))
         val output = classifier.classify(tensor)
         Log.d(TAG, output.toString())
-
-        return output[0].categories.find { it.label == "Finger snapping" }!!.score
+        Log.d(TAG, "HI : " + output[0].categories[0].score)
+        return 1.0F//output[0].categories.find { it.label == "Finger snapping" }!!.score
     }
 
     fun startInferencing() {
         if (task == null) {
             task = Timer().scheduleAtFixedRate(0, REFRESH_INTERVAL_MS) {
-                val score = inference()
-                detectorListener?.onResults(score)
+                if(controller.allowRun()){
+                    val score = inference()
+                    detectorListener?.onResults(score)
+                }
             }
         }
     }
@@ -144,6 +147,7 @@ class SnapClassifier {
      * @property    TAG                 tag for logging
      * @property    REFRESH_INTERVAL_MS refresh interval of the inference
      * @property    YAMNET_MODEL        file path of the model file
+     * @property    TEACHED_MODEL       file from teachable machine
      * @property    THRESHOLD           threshold of the score to classify sound as a horn sound
      */
     companion object {
@@ -151,7 +155,7 @@ class SnapClassifier {
 
         const val REFRESH_INTERVAL_MS = 33L
         const val YAMNET_MODEL = "yamnet_classification.tflite"
-
+        const val TEACHED_MODEL = "soundclassifier_with_metadata.tflite"
         const val THRESHOLD = 0.3f
     }
 }
