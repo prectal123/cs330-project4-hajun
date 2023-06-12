@@ -14,6 +14,7 @@ import com.example.pj4test.controller.ModelController
 class SnapClassifier {
     // Libraries for audio classification
     lateinit var classifier: AudioClassifier
+    //lateinit var classifier2: AudioClassifier
     lateinit var recorder: AudioRecord
     lateinit var tensor: TensorAudio
     lateinit var controller: ModelController
@@ -34,6 +35,7 @@ class SnapClassifier {
      */
     fun initialize(context: Context) {
         classifier = AudioClassifier.createFromFile(context, TEACHED_MODEL)
+        //classifier2 = AudioClassifier.createFromFile(context, YAMNET_MODEL)//Use same format as previous one
         controller = ModelController.getInstance()
         Log.d(TAG, "Model loaded from: $YAMNET_MODEL")
         audioInitialize()
@@ -49,7 +51,6 @@ class SnapClassifier {
      */
     private fun audioInitialize() {
         tensor = classifier.createInputTensorAudio()
-
         val format = classifier.requiredTensorAudioFormat
         val recorderSpecs = "Number Of Channels: ${format.channels}\n" +
                 "Sample Rate: ${format.sampleRate}"
@@ -99,8 +100,9 @@ class SnapClassifier {
         Log.d(TAG, tensor.tensorBuffer.shape.joinToString(","))
         val output = classifier.classify(tensor)
         Log.d(TAG, output.toString())
-        Log.d(TAG, "HI : " + output[0].categories[0].score)
-        return 1.0F//output[0].categories.find { it.label == "Finger snapping" }!!.score
+        Log.d(TAG, "Audio Classifier : " + output[0].categories[0].score)
+        controller.setFootStepScore(output[0].categories.find { it.label == "1 footstep" }!!.score)
+        return output[0].categories.find { it.label == "1 footstep" }!!.score
     }
 
     fun startInferencing() {
@@ -155,7 +157,7 @@ class SnapClassifier {
 
         const val REFRESH_INTERVAL_MS = 33L
         const val YAMNET_MODEL = "yamnet_classification.tflite"
-        const val TEACHED_MODEL = "soundclassifier_with_metadata.tflite"
+        const val TEACHED_MODEL = "game_footstep_model.tflite"
         const val THRESHOLD = 0.3f
     }
 }

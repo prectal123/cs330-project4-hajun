@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.util.rangeTo
 import androidx.fragment.app.Fragment
 import com.example.pj4test.ProjectConfiguration
 import com.example.pj4test.audioInference.SnapClassifier
@@ -55,13 +56,15 @@ class AudioFragment: Fragment(), SnapClassifier.DetectorListener {
     }
 
     override fun onResults(score: Float) {
+//        val thousand: Int = ((score * 1000).toInt())
+//        val to_show: Float = (thousand.toFloat()/1000)
         activity?.runOnUiThread {
             if (score > SnapClassifier.THRESHOLD) {
-                snapView.text = "SNAP"
+                snapView.text = "Foot : ${score}"
                 snapView.setBackgroundColor(ProjectConfiguration.activeBackgroundColor)
                 snapView.setTextColor(ProjectConfiguration.activeTextColor)
             } else {
-                snapView.text = "NO SNAP"
+                snapView.text = "NO Foot : ${score}"
                 snapView.setBackgroundColor(ProjectConfiguration.idleBackgroundColor)
                 snapView.setTextColor(ProjectConfiguration.idleTextColor)
             }

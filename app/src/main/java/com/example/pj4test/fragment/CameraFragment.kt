@@ -25,23 +25,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.camera.core.AspectRatio
-import androidx.camera.core.Camera
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.*
 import androidx.camera.core.ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.example.pj4test.ProjectConfiguration
-import java.util.LinkedList
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import com.example.pj4test.cameraInference.PersonClassifier
+import com.example.pj4test.controller.ModelController
 import com.example.pj4test.databinding.FragmentCameraBinding
 import org.tensorflow.lite.task.vision.detector.Detection
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
     private val TAG = "CameraFragment"
@@ -52,15 +48,16 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
         get() = _fragmentCameraBinding!!
     
     private lateinit var personView: TextView
-    
+    lateinit var controller: ModelController
     private lateinit var personClassifier: PersonClassifier
     private lateinit var bitmapBuffer: Bitmap
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
-
+    private lateinit var cameraProvider: ProcessCameraProvider
     /** Blocking camera operations are performed using this executor */
     private lateinit var cameraExecutor: ExecutorService
+    private var binded: Boolean = false
 
     override fun onDestroyView() {
         _fragmentCameraBinding = null
@@ -76,7 +73,7 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
         savedInstanceState: Bundle?
     ): View {
         _fragmentCameraBinding = FragmentCameraBinding.inflate(inflater, container, false)
-
+        controller = ModelController.getInstance()
         return fragmentCameraBinding.root
     }
 
@@ -106,7 +103,7 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
         cameraProviderFuture.addListener(
             {
                 // CameraProvider
-                val cameraProvider = cameraProviderFuture.get()
+                cameraProvider = cameraProviderFuture.get()
 
                 // Build and bind the camera use cases
                 bindCameraUseCases(cameraProvider)
@@ -156,11 +153,29 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
                 preview,
                 imageAnalyzer
             )
+            cameraProvider.unbind(preview)
+
         } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
     }
 
+    private fun unbindCamera() {
+        cameraProvider.unbind(preview)
+    }
+
+    private fun bindCamera() {
+        Log.d("BINDDD", "BIDNDDDDdd")
+
+        cameraProvider.unbindAll()
+        val cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+            cameraProvider.bindToLifecycle(
+                this,
+                cameraSelector,
+                preview,
+                imageAnalyzer
+            )
+    }
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         imageAnalyzer?.targetRotation = fragmentCameraBinding.viewFinder.display.rotation
@@ -179,20 +194,32 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
         // Copy out RGB bits to the shared bitmap buffer
         image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
         val imageRotation = image.imageInfo.rotationDegrees
-
+        Log.d("hell","not here")
         // Pass Bitmap and rotation to the object detector helper for processing and detection
+
         personClassifier.detect(bitmapBuffer, imageRotation)
+
     }
 
     // Update UI after objects have been detected. Extracts original image height/width
     // to scale and place bounding boxes properly through OverlayView
     override fun onObjectDetectionResults(
+        classificationResult: String,
+        classificationScore: Float,
         results: MutableList<Detection>?,
         inferenceTime: Long,
         imageHeight: Int,
         imageWidth: Int
     ) {
         activity?.runOnUiThread {
+            if(controller.needBindCamera() && !binded) {
+                bindCamera()
+                binded = true
+            }
+            if(!controller.needBindCamera() && binded){
+                unbindCamera()
+                binded = false
+            }
             // Pass necessary information to OverlayView for drawing on the canvas
             fragmentCameraBinding.overlay.setResults(
                 results ?: LinkedList<Detection>(),
@@ -202,14 +229,14 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
             
             // find at least one bounding box of the person
             val isPersonDetected: Boolean = results!!.find { it.categories[0].label == "person" } != null
-            
+            val isRoommate: Boolean = classificationResult=="1"
             // change UI according to the result
-            if (isPersonDetected) {
-                personView.text = "PERSON"
+            if (isRoommate && classificationScore > 0.9F) {
+                personView.text = "Run AWAY!!! : $classificationScore"
                 personView.setBackgroundColor(ProjectConfiguration.activeBackgroundColor)
                 personView.setTextColor(ProjectConfiguration.activeTextColor)
             } else {
-                personView.text = "NO PERSON"
+                personView.text = "NO Roommate Yet : $classificationScore"
                 personView.setBackgroundColor(ProjectConfiguration.idleBackgroundColor)
                 personView.setTextColor(ProjectConfiguration.idleTextColor)
             }
