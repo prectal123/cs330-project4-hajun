@@ -58,7 +58,7 @@ class PersonClassifier {
 
         val optionsForClassifierBuilder =
             ImageClassifier.ImageClassifierOptions.builder()
-                .setScoreThreshold(THRESHOLD)
+                .setScoreThreshold(0F)
                 .setMaxResults(3)//////
 
         // Set general detection options, including number of used threads
@@ -83,7 +83,7 @@ class PersonClassifier {
     fun detect(image: Bitmap, imageRotation: Int) {
         // Inference time is the difference between the system time at the start and finish of the
         // process
-        if(!controller.allowRun()){
+        if(!controller.allowCameraProceed()){
             return
         }
         var inferenceTime = SystemClock.uptimeMillis()
@@ -99,16 +99,18 @@ class PersonClassifier {
         // Preprocess the image and convert it into a TensorImage for detection.
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
 
-        val results = objectDetector.detect(tensorImage)
+        //val results = objectDetector.detect(tensorImage)
         val results_class = imageClassifier.classify(tensorImage)
         Log.d("Classification","Class res is : $results_class")
-        controller.setResult(results.toString())
+        //controller.setResult(results.toString())
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
+
         if(results_class[0].categories.isNotEmpty()){
+            controller.setPersonScore(results_class[0].categories.find{ it.label == "1" }!!.score)
         objectDetectorListener?.onObjectDetectionResults(
             results_class[0].categories[0].label,
             results_class[0].categories[0].score,
-            results,
+            //results,
             inferenceTime,
             tensorImage.height,
             tensorImage.width)}
@@ -119,7 +121,7 @@ class PersonClassifier {
         fun onObjectDetectionResults(
             classificationResult: String,
             classificationScore: Float,
-            results: MutableList<Detection>?,
+            //results: MutableList<Detection>?,
             inferenceTime: Long,
             imageHeight: Int,
             imageWidth: Int

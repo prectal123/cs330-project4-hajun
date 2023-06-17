@@ -194,7 +194,6 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
         // Copy out RGB bits to the shared bitmap buffer
         image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
         val imageRotation = image.imageInfo.rotationDegrees
-        Log.d("hell","not here")
         // Pass Bitmap and rotation to the object detector helper for processing and detection
 
         personClassifier.detect(bitmapBuffer, imageRotation)
@@ -203,35 +202,38 @@ class CameraFragment : Fragment(), PersonClassifier.DetectorListener {
 
     // Update UI after objects have been detected. Extracts original image height/width
     // to scale and place bounding boxes properly through OverlayView
+    @SuppressLint("SetTextI18n")
     override fun onObjectDetectionResults(
         classificationResult: String,
         classificationScore: Float,
-        results: MutableList<Detection>?,
+        //results: MutableList<Detection>?,
         inferenceTime: Long,
         imageHeight: Int,
         imageWidth: Int
     ) {
+        Log.d("CAMM", "${!controller.needBindCamera()}, ${binded}")
         activity?.runOnUiThread {
             if(controller.needBindCamera() && !binded) {
                 bindCamera()
                 binded = true
             }
             if(!controller.needBindCamera() && binded){
-                unbindCamera()
+
+                cameraProvider.unbind(preview)
                 binded = false
             }
             // Pass necessary information to OverlayView for drawing on the canvas
-            fragmentCameraBinding.overlay.setResults(
-                results ?: LinkedList<Detection>(),
-                imageHeight,
-                imageWidth
-            )
+//            fragmentCameraBinding.overlay.setResults(
+//                results ?: LinkedList<Detection>(),
+//                imageHeight,
+//                imageWidth
+//            )
             
             // find at least one bounding box of the person
-            val isPersonDetected: Boolean = results!!.find { it.categories[0].label == "person" } != null
+            //val isPersonDetected: Boolean = results!!.find { it.categories[0].label == "person" } != null
             val isRoommate: Boolean = classificationResult=="1"
             // change UI according to the result
-            if (isRoommate && classificationScore > 0.9F) {
+            if (isRoommate && classificationScore > 0.9F && controller.needBindCamera()) {
                 personView.text = "Run AWAY!!! : $classificationScore"
                 personView.setBackgroundColor(ProjectConfiguration.activeBackgroundColor)
                 personView.setTextColor(ProjectConfiguration.activeTextColor)

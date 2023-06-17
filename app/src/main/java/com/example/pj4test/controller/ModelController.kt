@@ -1,20 +1,25 @@
 package com.example.pj4test.controller
 
-import android.util.Log
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.SystemClock
-import com.example.pj4test.fragment.CameraFragment
-import java.util.Vector
+import java.util.*
+import android.content.Context
+import android.os.BatteryManager
+import android.os.Bundle
+///import androidx.core.content.ContentProviderCompat.requireContext
 
 class ModelController private constructor() {
     private val HIGH_AUDIO_INTERVAL = 200L
-    private val LOW_AUDIO_INTERVAL = 50L
-    private val HIGH_IMAGE_INTERVAL = 200L
-    private val LOW_IMAGE_INTERVAL = 50L
+    private val LOW_AUDIO_INTERVAL = 80L
+    private val HIGH_IMAGE_INTERVAL = 500L
+    private val LOW_IMAGE_INTERVAL = 100L
 
-    private val AUDIO_THRESHOLD = 0.3F
-    private val IMAGE_THRESHOLD = 0.5F
+    private val GAME_THRESHOLD = 0.3F
+    private val FOOT_THRESHOLD = 0.5F
+    private val IMAGE_THRESHOLD = 0.8F
 
-    private var result = ""
     private var reloadInterval = 0L
     private var allowTime = 0L
     private var personScore = 0F
@@ -27,12 +32,11 @@ class ModelController private constructor() {
     private var imageTimeWindow = Vector<Float>()
     private var isGaming = false
     private var isFootstep = false
+    private var isCharging = false
 
-    fun onCreate(){
-        result = "Not set yet"
-    }
     private fun calculateAverage(vec: Vector<Float>): Float{
         var sum: Float = 0F
+        if(vec.size == 0) return 0F
         for(i in vec){
             sum += i
         }
@@ -43,41 +47,56 @@ class ModelController private constructor() {
         return "Audio Interval: $audioInterval, Image Interval: $imageInterval"
     }
     fun setGamingScore(score: Float){
-        if(gamingTimeWindow.size == 10){ gamingTimeWindow.removeElementAt(0) }
+        if(gamingTimeWindow.size >= 3){
+        gamingTimeWindow = Vector<Float>(gamingTimeWindow.slice(gamingTimeWindow.size-3..gamingTimeWindow.size-1))}
         gamingTimeWindow.addElement(score)
-        if(calculateAverage(gamingTimeWindow) > AUDIO_THRESHOLD ){
-            isGaming = true
-        }
+        isGaming = calculateAverage(gamingTimeWindow) > GAME_THRESHOLD
     }
     fun needBindCamera(): Boolean{
-        Log.d("Controller", "WHY ${calculateAverage(footStepTimeWindow)}")
-        return isFootstep
+        //Log.d("Controller", "WHY ${isGaming||isFootstep}")
+        return (calculateAverage(gamingTimeWindow) > GAME_THRESHOLD || calculateAverage(footStepTimeWindow) > FOOT_THRESHOLD)
     }
 
     fun setPersonScore(score: Float){
         personScore = score
-        if(imageTimeWindow.size == 10){ imageTimeWindow.removeElementAt(0) }
+        if(imageTimeWindow.size >= 10){
+            imageTimeWindow = Vector<Float>(
+                imageTimeWindow.slice(imageTimeWindow.size-10..imageTimeWindow.size-1)) }
         imageTimeWindow.addElement(score)
         if(calculateAverage(imageTimeWindow) > IMAGE_THRESHOLD) { imageInterval = LOW_IMAGE_INTERVAL }
         else { imageInterval = HIGH_IMAGE_INTERVAL }
     }
 
+    fun setCharge(charge : Boolean) {
+        isCharging = charge
+    }
+
+    fun getStatus():String {
+        //Log.d("Controller", "WHY ${calculateAverage(gamingTimeWindow)} isgame: ${isGaming}")
+        val game_avg = calculateAverage(gamingTimeWindow)
+        val foot_avg = calculateAverage(footStepTimeWindow)
+        if(game_avg > GAME_THRESHOLD || foot_avg > FOOT_THRESHOLD) { return "ACTIVE" }
+        else {return "inactive Game:"+game_avg.toString()+" Foot: "+ foot_avg.toString()}
+    }
+
     fun setFootStepScore(score: Float){
-        Log.d("Controller", "In set score")
-        if(footStepTimeWindow.size == 1){ footStepTimeWindow.removeElementAt(0) }
+        //Log.d("Controller", "In set score")
+        if(footStepTimeWindow.size >= 3){ footStepTimeWindow = Vector<Float>(footStepTimeWindow.slice(footStepTimeWindow.size-3..footStepTimeWindow.size-1)) }
         footStepTimeWindow.addElement(score)
-        if(calculateAverage(footStepTimeWindow) > AUDIO_THRESHOLD) {
-            audioInterval = LOW_AUDIO_INTERVAL
+        if(calculateAverage(footStepTimeWindow) > FOOT_THRESHOLD) {
             isFootstep = true
+            imageInterval = LOW_IMAGE_INTERVAL
         }
         else {
-            audioInterval = HIGH_AUDIO_INTERVAL
             isFootstep = false
+            imageInterval = HIGH_IMAGE_INTERVAL
         }
+        if(isFootstep||isGaming) audioInterval = LOW_AUDIO_INTERVAL
+        else audioInterval = HIGH_AUDIO_INTERVAL
     }
 
     fun allowCameraProceed(): Boolean{
-        if(imageAllowTime <= SystemClock.uptimeMillis()){
+        if(imageAllowTime <= SystemClock.uptimeMillis() || isCharging){
             imageAllowTime = SystemClock.uptimeMillis() + imageInterval
             return true
         }
@@ -86,19 +105,13 @@ class ModelController private constructor() {
         }
     }
     fun allowAudioProceed(): Boolean{
-        if(isGaming && audioAllowTime <= SystemClock.uptimeMillis()){
+        if(audioAllowTime <= SystemClock.uptimeMillis() || isCharging){
             audioAllowTime = SystemClock.uptimeMillis() + audioInterval
             return true
         }
         else {
             return false
         }
-    }
-    fun setResult(text: String){
-        Log.d("Control", result)
-        result = text
-        Log.d("Control",result)
-        //Collects the state of model reading ins.
     }
 
     fun allowRun(): Boolean {

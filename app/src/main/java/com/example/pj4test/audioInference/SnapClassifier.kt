@@ -10,6 +10,7 @@ import org.tensorflow.lite.task.audio.classifier.AudioClassifier
 import java.util.*
 import kotlin.concurrent.scheduleAtFixedRate
 import com.example.pj4test.controller.ModelController
+import org.tensorflow.lite.task.audio.classifier.Classifications
 
 class SnapClassifier {
     // Libraries for audio classification
@@ -95,22 +96,24 @@ class SnapClassifier {
      *
      * @return  A score of the maximum float value among three classes
      */
-    fun inference(): Float {
+    fun inference(): MutableList<Classifications> {
         tensor.load(recorder)
         Log.d(TAG, tensor.tensorBuffer.shape.joinToString(","))
         val output = classifier.classify(tensor)
         Log.d(TAG, output.toString())
         Log.d(TAG, "Audio Classifier : " + output[0].categories[0].score)
         controller.setFootStepScore(output[0].categories.find { it.label == "1 footstep" }!!.score)
-        return output[0].categories.find { it.label == "1 footstep" }!!.score
+        controller.setGamingScore(output[0].categories.find { it.label == "2 game" }!!.score)
+        return output//[0].categories.find { it.label == "1 footstep" }!!.score
     }
 
     fun startInferencing() {
         if (task == null) {
             task = Timer().scheduleAtFixedRate(0, REFRESH_INTERVAL_MS) {
-                if(controller.allowRun()){
+                if(controller.allowAudioProceed()){
                     val score = inference()
-                    detectorListener?.onResults(score)
+                    if(score.isNotEmpty())
+                        detectorListener?.onResults(score[0].categories.find { it.label == "1 footstep" }!!.score, score[0].categories.find { it.label == "2 game" }!!.score)
                 }
             }
         }
@@ -129,7 +132,7 @@ class SnapClassifier {
      * and set itself to this' detector listener
      */
     interface DetectorListener {
-        fun onResults(score: Float)
+        fun onResults(FootScore: Float, GameScore: Float)
     }
 
     /**
